@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a1d26">
+<title>Laptop Lab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="banner" role="status"><span>New: keyboard test, system info and a printable field report. Check off each test to earn its stamp.</span><button id="bannerX" aria-label="Dismiss">×</button></div>
+<div class="shell">
+<aside>
+  <div class="brand"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>Laptop Lab<small>Field kit · v0.2</small></div>
+  <nav id="nav"></nav>
+  <nav class="bottom">
+    <button data-go="report" style="--c:#8fcf6b"><svg viewBox="0 0 24 24"><path d="M5 3h14v18H5zM9 8h6M9 12h6M9 16h4"/></svg>Field report<i>›</i></button>
+    <button data-go="docs" style="--c:#e9d8a6"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4"/></svg>Docs<i>›</i></button>
+  </nav>
+</aside>
+<main>
+  <section data-page="home">
+    <div class="hero">
+      <div><h1>Ready your laptop.</h1><p class="sub">Run each check, collect its stamp, then export a field report of everything that passed. Nothing is installed or uploaded.</p></div>
+      <svg class="compass" viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="74" fill="none" stroke="#1d4a57" stroke-width="2"/><circle cx="80" cy="80" r="58" fill="none" stroke="#e9d8a6" stroke-width="1" stroke-dasharray="2 6"/><text x="80" y="22">N</text><text x="80" y="146">S</text><text x="139" y="84">E</text><text x="21" y="84">W</text><g class="needle"><polygon points="80,30 90,80 80,73 70,80" fill="#ff7a1a"/><polygon points="80,130 90,80 80,87 70,80" fill="#dff4f1" opacity=".7"/></g><circle cx="80" cy="80" r="5" fill="#0a1d26" stroke="#e9d8a6"/></svg>
+    </div>
+    <div class="devcard">
+      <h2>Your checks</h2>
+      <div id="progText" class="hint">0 of 8 checks done</div><div class="prog"><div id="progBar"></div></div>
+      <div class="tiles" id="tiles"></div>
+      <h2 style="margin-top:22px">Browser support</h2><ul class="kv" id="compat"></ul>
+    </div>
+  </section>
+
+  <section data-page="display" hidden>
+    <h1>Display</h1><p class="sub">Fill the screen with solid colors to spot dead pixels, stuck pixels and uneven backlight. Click to change color, Esc to exit. View all seven fills to earn the stamp.</p>
+    <div class="row"><button class="ghost" id="fsStart">Start screen test</button></div>
+    <ul class="kv" id="screenInfo"></ul>
+  </section>
+
+  <section data-page="camera" hidden>
+    <h1>Camera</h1><p class="sub">Preview your webcam and see the resolution and frame rate it actually delivers.</p>
+    <div class="row"><button class="ghost" id="camOn">Start camera</button><button class="ghost" id="camOff" disabled>Stop</button></div>
+    <video id="cam" autoplay playsinline muted></video><ul class="kv" id="camInfo"></ul>
+  </section>
+
+  <section data-page="mic" hidden>
+    <h1>Microphone</h1><p class="sub">Speak and watch the level. Nothing is recorded. Get the peak above -40 dB to earn the stamp.</p>
+    <div class="row"><button class="ghost" id="micOn">Start microphone</button><button class="ghost" id="micOff" disabled>Stop</button></div>
+    <div class="meter"><div id="meter"></div></div><ul class="kv" id="micInfo"></ul>
+  </section>
+
+  <section data-page="pointer" hidden>
+    <h1>Touchpad &amp; mouse</h1><p class="sub">Move, left-click, right-click and scroll inside the box to earn the stamp. Try two-finger scroll and pinch on your touchpad.</p>
+    <div id="pad">Use your touchpad or mouse here</div>
+    <ul class="kv" id="padInfo"></ul><button class="ghost" id="padReset">Reset counts</button>
+  </section>
+
+  <section data-page="keyboard" hidden>
+    <h1>Keyboard</h1><p class="sub">Press every key. Tested keys turn green, held keys turn orange. Works on your built-in laptop keyboard.</p>
+    <div class="stats"><div><b id="kbTested">0</b> keys tested</div><div><b id="kbHeld">0</b> held now</div><div><b id="kbMax">0</b> most at once</div><button class="ghost" id="kbReset">Reset</button></div>
+    <div class="scroll"><div id="kbd"></div></div><ul class="kv" id="kbLast"></ul>
+  </section>
+
+  <section data-page="speakers" hidden>
+    <h1>Speakers</h1><p class="sub">Play tones through the left channel, the right channel or both, or sweep the full range to hear rattles and distortion. Play left and right to earn the stamp.</p>
+    <div class="row"><label>Output <select id="spkOut"><option value="">System default</option></select></label><button class="ghost" id="spkList">Refresh outputs</button></div>
+    <div class="row">
+      <label>Tone <select id="freq"><option value="100">100 Hz (bass)</option><option value="440" selected>440 Hz</option><option value="1000">1 kHz</option><option value="5000">5 kHz (treble)</option></select></label>
+      <label>Volume <input type="range" id="vol" min="0" max="1" step=".05" value=".3"></label>
+    </div>
+    <div class="row"><button class="ghost" data-pan="-1">Left</button><button class="ghost" data-pan="0">Both</button><button class="ghost" data-pan="1">Right</button><button class="ghost" id="sweep">Sweep</button><button class="ghost" id="stopTone">Stop</button></div>
+    <p id="spkNote" class="hint" role="status"></p>
+  </section>
+
+  <section data-page="battery" hidden>
+    <h1>Battery</h1><p class="sub">Live charge level and charging state.</p><ul class="kv" id="batInfo"><li>Loading…</li></ul>
+  </section>
+
+  <section data-page="system" hidden>
+    <h1>System</h1><p class="sub">What your browser can tell about this laptop: processor threads, memory, graphics and connection.</p>
+    <ul class="kv" id="sysInfo"></ul>
+  </section>
+
+  <section data-page="report" hidden>
+    <h1>Field report</h1><p class="sub">Every check you've run, with its result. Results are kept in this browser until you clear them.</p>
+    <div class="row"><button class="ghost" id="repTxt">Download report</button><button class="ghost" id="repJson">Download JSON</button><button class="ghost" id="repPrint">Print</button><button class="ghost" id="repClear">Clear results</button></div>
+    <ul class="kv rep" id="repList"></ul>
+  </section>
+
+  <section data-page="docs" hidden class="doc">
+    <h1>Docs</h1>
+    <h3>What works where?</h3><p>Camera, microphone, keyboard and speakers work in all current browsers. Battery info and speaker selection need Chrome, Edge or Opera. Camera and microphone need HTTPS or localhost and your permission.</p>
+    <h3>How do stamps work?</h3><p>A stamp is awarded when a test shows real results, such as every screen fill viewed or both speaker channels played. Speaker and display stamps record that the test ran; you judge by eye and ear whether it looked and sounded right.</p>
+    <h3>Why can't I change settings?</h3><p>Browsers can read and test hardware but can't change system settings such as keys, brightness or power plans. Use Windows settings for those.</p>
+  </section>
+</main>
+</div>
+<noscript><p style="padding:20px">Laptop Lab needs JavaScript.</p></noscript>
+<script src="app.js"></script>
+</body>
+</html>
