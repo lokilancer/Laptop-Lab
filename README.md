@@ -1,5 +1,6 @@
 # Laptop Lab
 
+[🚀 Try it live](https://lokilancer.github.io/Laptop-Lab/)   
 An expedition-styled browser app that tests your laptop hardware. Nothing to install, nothing uploaded.
 
 ## Checks
