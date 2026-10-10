@@ -9,17 +9,22 @@ const TESTS = [
   ['mic','Microphone','#2dd4bf','<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>'],
   ['pointer','Touchpad & mouse','#a78bfa','<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7"/>'],
   ['keyboard','Keyboard','#f472b6','<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>'],
+  ['gamepad','Game controller','#c084fc','<rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 11v3M6.5 12.5h3M16 11.5h.01M18 13.5h.01"/>'],
   ['speakers','Speakers','#fb923c','<path d="M4 9h4l5-4v14l-5-4H4zM17 8a5 5 0 010 8"/>'],
   ['battery','Battery','#facc15','<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 11v2M7 10v4M11 10v4"/>'],
+  ['network','Network speed','#38bdf8','<path d="M2 9a15 15 0 0120 0M5 12.5a10 10 0 0114 0M8.5 16a5 5 0 017 0M12 19.5h.01"/>'],
+  ['wifi','Wi-Fi stability','#22d3ee','<path d="M3 17l4-6 4 3 4-8 6 11"/><path d="M3 21h18"/>'],
+  ['benchmark','Performance','#f87171','<path d="M4 17a8 8 0 1116 0M12 17l4-6"/>'],
   ['system','System','#60a5fa','<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>']
 ];
-const CHECKS = TESTS.map(t => t[0]);
+const NAME = Object.fromEntries(TESTS.map(t => [t[0], t[1]])), CHECKS = TESTS.map(t => t[0]).filter(id => id !== 'gamepad' && (id !== 'battery' || navigator.getBattery));
+const status = id => R[id] && R[id].done ? (R[id].warn ? 'Check' : 'Done') : id === 'gamepad' ? 'Optional' : 'Not run';
 let R = {}; try{ R = JSON.parse(localStorage.getItem('ll-results') || '{}'); }catch(e){}
-function mark(id, detail){ R[id] = { done: true, detail, at: new Date().toLocaleString() }; try{ localStorage.setItem('ll-results', JSON.stringify(R)); }catch(e){} paint(); }
+function mark(id, detail, warn){ R[id] = { done: true, warn: !!warn, detail, at: new Date().toLocaleString() }; try{ localStorage.setItem('ll-results', JSON.stringify(R)); }catch(e){} paint(); }
 function paint(){
   const d = id => !!(R[id] && R[id].done);
-  document.querySelectorAll('[data-go]').forEach(b => { if(CHECKS.includes(b.dataset.go)) b.classList.toggle('done', d(b.dataset.go)); });
-  const n = CHECKS.filter(d).length; $('progText').textContent = `${n} of ${CHECKS.length} checks done`; $('progBar').style.width = (n / CHECKS.length * 100) + '%';
+  document.querySelectorAll('[data-go]').forEach(b => { if(NAME[b.dataset.go]){ b.classList.toggle('done', d(b.dataset.go)); b.classList.toggle('warn', !!(R[b.dataset.go] && R[b.dataset.go].warn)); } });
+  const n = CHECKS.filter(d).length; $('progText').textContent = `${n} of ${CHECKS.length} checks done`; $('progBar').style.width = (n / CHECKS.length * 100) + '%'; $('summit').hidden = n < CHECKS.length;
 }
 const icon = (c, p) => `<svg viewBox="0 0 24 24" style="--c:${c}">${p}</svg>`;
 $('nav').innerHTML = `<button data-go="home" style="--c:#34d399"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10H3zM9 21v-7h6v7"/></svg>Home<i>›</i></button>` +
@@ -34,13 +39,15 @@ function go(name){
   if(name === 'display') screenInfo(); if(name === 'battery') battery().catch(e => $('batInfo').innerHTML = kv({ Status: 'Battery info is unavailable: ' + e.message }));
   if(name === 'speakers') listOutputs();
   if(name === 'system') system();
+  if(name === 'network') netInfo();
   if(name === 'report') report();
 }
 document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
 $('bannerX').onclick = () => $('banner').remove();
 
 // ---- Display ----
-const COLORS = ['#000', '#fff', '#f00', '#0f0', '#00f', '#808080', 'linear-gradient(90deg,#000,#fff)'];
+const COLORS = ['#000', '#fff', '#f00', '#0f0', '#00f', '#808080', 'linear-gradient(90deg,#000,#fff)',
+  'repeating-conic-gradient(#fff 0% 25%,#000 0% 50%) 0 0/48px 48px', 'linear-gradient(#fff 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,#fff 1px,transparent 1px) 0 0/48px 48px,#000'];
 let fsIdx = -1; const fs = document.createElement('div'); fs.id = 'fs'; fs.innerHTML = '<span>Click: next color · Esc: exit</span>'; document.body.append(fs);
 function showFs(){ if(fsIdx >= COLORS.length){ mark('display', 'Viewed all ' + COLORS.length + ' fills'); closeFs(); return; } fs.style.background = COLORS[fsIdx]; fs.style.display = 'block'; }
 function closeFs(){ fs.style.display = 'none'; fsIdx = -1; const ex = document.exitFullscreen || document.webkitExitFullscreen; if((document.fullscreenElement || document.webkitFullscreenElement) && ex) ex.call(document); }
@@ -58,13 +65,14 @@ let camStream;
 $('camOn').onclick = async () => {
   try{
     if(noMedia()) throw new Error('Camera needs HTTPS or localhost and a modern browser.');
-    camStream = await navigator.mediaDevices.getUserMedia({ video: true }); $('cam').srcObject = camStream;
+    const sz = { 1080: [1920, 1080], 720: [1280, 720], 480: [640, 480] }[$('camRes').value];
+    camStream = await navigator.mediaDevices.getUserMedia({ video: sz ? { width: { ideal: sz[0] }, height: { ideal: sz[1] } } : true }); $('cam').srcObject = camStream;
     const t = camStream.getVideoTracks()[0], s = t.getSettings();
     $('camInfo').innerHTML = kv({ Name: t.label, Resolution: `${s.width} × ${s.height}`, 'Frame rate': (s.frameRate || 'n/a') + ' fps', 'Aspect ratio': s.aspectRatio ? s.aspectRatio.toFixed(3) : 'n/a', 'Device ID': s.deviceId });
-    $('camOff').disabled = false; mark('camera', `${s.width}×${s.height} at ${s.frameRate || '?'} fps`);
+    $('camOff').disabled = false; $('camSnap').disabled = false; mark('camera', `${s.width}×${s.height} at ${s.frameRate || '?'} fps`);
   }catch(e){ $('camInfo').innerHTML = kv({ Error: e.name + ': ' + e.message }); }
 };
-$('camOff').onclick = () => { camStream.getTracks().forEach(t => t.stop()); $('cam').srcObject = null; $('camOff').disabled = true; };
+$('camOff').onclick = () => { camStream.getTracks().forEach(t => t.stop()); $('cam').srcObject = null; $('camOff').disabled = true; $('camSnap').disabled = true; };
 
 // ---- Microphone ----
 let micStream, micCtx, raf, peak = -100;
@@ -86,13 +94,14 @@ $('micOff').onclick = () => { cancelAnimationFrame(raf); micStream.getTracks().f
 
 // ---- Touchpad & mouse ----
 const pad = $('pad'); let st, rate = 0, moves = 0;
-const resetPad = () => st = { L: 0, M: 0, R: 0, dbl: 0, wx: 0, wy: 0, pinch: 0, x: '-', y: '-', type: '-', pressure: '-' };
+const resetPad = () => st = { L: 0, M: 0, R: 0, dbl: 0, wx: 0, wy: 0, pinch: 0, fmax: 0, x: '-', y: '-', type: '-', pressure: '-' };
 function drawPad(){ if(st.L && st.R && (st.wx || st.wy) && !(R.pointer && R.pointer.done)) mark('pointer', 'Left click, right click and scroll registered');
-  $('padInfo').innerHTML = kv({ Position: `${st.x}, ${st.y}`, 'Input type': st.type, Pressure: st.pressure, 'Left clicks': st.L, 'Middle clicks': st.M, 'Right clicks': st.R, 'Double clicks': st.dbl, 'Scroll X / Y': `${st.wx} / ${st.wy}`, 'Pinch events': st.pinch, 'Move events/sec': rate }); }
+  $('padInfo').innerHTML = kv({ Position: `${st.x}, ${st.y}`, 'Input type': st.type, Pressure: st.pressure, 'Left clicks': st.L, 'Middle clicks': st.M, 'Right clicks': st.R, 'Double clicks': st.dbl, 'Scroll X / Y': `${st.wx} / ${st.wy}`, 'Pinch events': st.pinch, 'Max fingers at once': st.fmax, 'Move events/sec': rate }); }
 resetPad(); drawPad(); $('padReset').onclick = () => { resetPad(); drawPad(); };
 pad.onpointermove = e => { moves++; Object.assign(st, { x: Math.round(e.offsetX), y: Math.round(e.offsetY), type: e.pointerType, pressure: e.pressure.toFixed(2) }); drawPad(); };
-pad.onpointerdown = e => { st[['L', 'M', 'R'][e.button] || 'L']++; pad.classList.add('on'); drawPad(); };
-pad.onpointerup = () => pad.classList.remove('on');
+const fingers = new Set();
+pad.onpointerdown = e => { fingers.add(e.pointerId); st.fmax = Math.max(st.fmax, fingers.size); st[['L', 'M', 'R'][e.button] || 'L']++; pad.classList.add('on'); drawPad(); };
+pad.onpointerup = pad.onpointercancel = e => { fingers.delete(e.pointerId); pad.classList.remove('on'); };
 pad.ondblclick = () => { st.dbl++; drawPad(); };
 pad.oncontextmenu = e => e.preventDefault();
 pad.addEventListener('gesturechange', () => { st.pinch++; drawPad(); });
@@ -147,8 +156,38 @@ async function battery(){
   const b = await navigator.getBattery();
   const draw = () => $('batInfo').innerHTML = kv({ Level: Math.round(b.level * 100) + '%', Charging: b.charging ? 'Yes' : 'No',
     'Time to full': b.charging && isFinite(b.chargingTime) ? Math.round(b.chargingTime / 60) + ' min' : '-', 'Time remaining': !b.charging && isFinite(b.dischargingTime) ? Math.round(b.dischargingTime / 60) + ' min' : '-' });
-  draw(); mark('battery', Math.round(b.level * 100) + '% ' + (b.charging ? 'charging' : 'on battery')); if(!batBound){ ['levelchange', 'chargingchange', 'chargingtimechange', 'dischargingtimechange'].forEach(ev => b.addEventListener(ev, draw)); batBound = true; }
+  draw(); mark('battery', Math.round(b.level * 100) + '% ' + (b.charging ? 'charging' : 'on battery') + (b.level < .2 && !b.charging ? ' (low)' : ''), b.level < .2 && !b.charging); if(!batBound){ ['levelchange', 'chargingchange', 'chargingtimechange', 'dischargingtimechange'].forEach(ev => b.addEventListener(ev, draw)); batBound = true; }
 }
+// ---- Extras: refresh rate, snapshot, mic playback ----
+$('hzBtn').onclick = () => {
+  let n = 0, t0; $('hz').textContent = 'Measuring for one second…';
+  const f = t => { if(!t0) t0 = t; n++; if(t - t0 < 1000) requestAnimationFrame(f); else $('hz').textContent = `Measured about ${Math.round(n / ((t - t0) / 1000))} Hz. Laptops may lower this on battery or in power-saving mode.`; };
+  requestAnimationFrame(f);
+};
+$('camMirror').onchange = () => $('cam').style.transform = $('camMirror').checked ? 'scaleX(-1)' : '';
+$('camSnap').onclick = () => {
+  const v = $('cam'); if(!v.videoWidth) return;
+  const c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; const x = c.getContext('2d');
+  if($('camMirror').checked){ x.translate(c.width, 0); x.scale(-1, 1); } x.drawImage(v, 0, 0);
+  c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'snapshot.png'; a.click(); });
+};
+$('micRec').onclick = async () => {
+  const btn = $('micRec');
+  try{
+    if(typeof MediaRecorder === 'undefined' || noMedia()) throw new Error('Recording is not supported here. Use HTTPS or localhost in a current browser.');
+    const s = micStream && micStream.active ? micStream : await navigator.mediaDevices.getUserMedia({ audio: true });
+    const rec = new MediaRecorder(s), chunks = []; btn.disabled = true; let left = 5; btn.textContent = `Recording… ${left}`;
+    const tick = setInterval(() => { left--; btn.textContent = left > 0 ? `Recording… ${left}` : 'Processing…'; }, 1000);
+    rec.ondataavailable = e => chunks.push(e.data);
+    rec.onstop = () => {
+      clearInterval(tick); if(s !== micStream) s.getTracks().forEach(t => t.stop());
+      const p = $('micPlay'); p.src = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType })); p.hidden = false; p.play().catch(() => {});
+      btn.disabled = false; btn.textContent = 'Record 5 s and play back'; mark('mic', 'Recorded 5 s and played it back');
+    };
+    rec.start(); setTimeout(() => rec.stop(), 5000);
+  }catch(e){ btn.disabled = false; btn.textContent = 'Record 5 s and play back'; $('micInfo').innerHTML = kv({ Error: e.message }); }
+};
+
 // ---- Keyboard ----
 const LBL = {Escape:'Esc',Backquote:'`',Minus:'-',Equal:'=',Backspace:'⌫',BracketLeft:'[',BracketRight:']',Backslash:'\\',CapsLock:'Caps',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',ShiftLeft:'Shift',ShiftRight:'Shift',ControlLeft:'Ctrl',ControlRight:'Ctrl',MetaLeft:'Win',MetaRight:'Win',AltLeft:'Alt',AltRight:'Alt',Space:'',ContextMenu:'Menu',PrintScreen:'PrtSc',ScrollLock:'ScrLk',Insert:'Ins',Delete:'Del',PageUp:'PgUp',PageDown:'PgDn',ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→'};
 const lab = c => LBL[c] ?? (c.startsWith('Key') ? c[3] : c.startsWith('Digit') ? c[5] : c);
@@ -187,19 +226,209 @@ function system(){
     'CPU threads': navigator.hardwareConcurrency || 'n/a', 'Memory (rounded)': navigator.deviceMemory ? 'at least ' + navigator.deviceMemory + ' GB' : 'n/a (Chrome and Edge only)', Graphics: gpu,
     Language: navigator.language, 'Time zone': Intl.DateTimeFormat().resolvedOptions().timeZone, Online: navigator.onLine ? 'Yes' : 'No',
     Connection: c.effectiveType ? `${c.effectiveType}, ${c.downlink} Mbps, ${c.rtt} ms` : 'n/a (Chrome and Edge only)', 'Dark mode': matchMedia('(prefers-color-scheme: dark)').matches ? 'On' : 'Off' };
-  $('sysInfo').innerHTML = kv(o); mark('system', `${o.Platform}, ${o['CPU threads']} threads, ${gpu}`);
+  $('sysInfo').innerHTML = kv(o);
+  (async () => { const x = {};
+    try{ const e = await navigator.storage.estimate(); x['Browser storage'] = `${(e.usage / 1e6).toFixed(1)} MB used of ${(e.quota / 1e9).toFixed(1)} GB allowed`; }catch(e){}
+    for(const n of ['camera', 'microphone', 'geolocation', 'notifications']){ try{ x[n[0].toUpperCase() + n.slice(1) + ' permission'] = (await navigator.permissions.query({ name: n })).state; }catch(e){} }
+    if(Object.keys(x).length) $('sysInfo').insertAdjacentHTML('beforeend', kv(x)); })();
+  mark('system', `${o.Platform}, ${o['CPU threads']} threads, ${gpu}`);
 }
 
-// ---- Field report ----
-function report(){
-  $('repList').innerHTML = TESTS.map(([id, n]) => { const r = R[id], ok = r && r.done;
-    return `<li><span>${n}</span><span class="chip ${ok ? 'ok' : 'no'}">${ok ? 'Done' : 'Not run'}</span><span>${ok ? esc(r.detail) : ''}</span></li>`; }).join('');
+// ---- Game controller ----
+setInterval(() => {
+  if(document.querySelector('[data-page="gamepad"]').hidden) return;
+  if(!navigator.getGamepads){ $('padList').innerHTML = kv({ Status: 'Game controllers are not supported in this browser.' }); return; }
+  const pads = [...navigator.getGamepads()].filter(Boolean);
+  if(!pads.length){ $('padList').innerHTML = '<li>No controller detected yet. Press a button on it.</li>'; return; }
+  $('padList').innerHTML = pads.map(p => { const on = p.buttons.map((b, i) => b.pressed ? i : -1).filter(i => i >= 0);
+    if(on.length && !(R.gamepad && R.gamepad.done)) mark('gamepad', 'Controller responded: ' + p.id.slice(0, 40));
+    return kv({ Controller: p.id.slice(0, 60), 'Buttons pressed': on.join(', ') || 'none', Axes: p.axes.map(v => v.toFixed(2)).join('  '), Mapping: p.mapping || 'non-standard' }); }).join('');
+}, 100);
+$('rumble').onclick = () => { const p = navigator.getGamepads && [...navigator.getGamepads()].find(Boolean), v = p && p.vibrationActuator;
+  if(v && v.playEffect) v.playEffect('dual-rumble', { duration: 500, strongMagnitude: 1, weakMagnitude: 1 }).catch(() => {}); else $('padList').insertAdjacentHTML('beforeend', '<li>This controller or browser does not support vibration.</li>'); };
+
+// ---- Guided run ----
+let tour = -1;
+function tourShow(){
+  if(tour < 0){ $('tour').hidden = true; return; }
+  const id = CHECKS[tour]; $('tour').hidden = false;
+  $('tourText').textContent = `Guided run: ${NAME[id]} (${tour + 1} of ${CHECKS.length})`;
+  $('tourNext').textContent = tour === CHECKS.length - 1 ? 'Finish' : 'Next check'; go(id);
 }
-const repText = () => ['Laptop Lab field report', new Date().toLocaleString(), ''].concat(TESTS.map(([id, n]) => `${n}: ${R[id] && R[id].done ? 'Done - ' + R[id].detail : 'Not run'}`)).join('\n');
+$('tourStart').onclick = () => { tour = 0; tourShow(); };
+$('tourNext').onclick = () => { if(tour >= CHECKS.length - 1){ tour = -1; tourShow(); go('report'); } else { tour++; tourShow(); } };
+$('tourExit').onclick = () => { tour = -1; tourShow(); };
+
+// ---- Offline support ----
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// ---- Network speed ----
+const SPEED = 'https://speed.cloudflare.com';
+const SIZES = { quick: { dl: 5e6, ul: 1e6, secs: 6 }, full: { dl: 25e6, ul: 4e6, secs: 10 } };
+const mbps = (bytes, t0) => bytes * 8 / ((performance.now() - t0) / 1000) / 1e6;
+let netCtl = null, NET = []; try{ NET = JSON.parse(localStorage.getItem('ll-net') || '[]'); }catch(e){}
+function netInfo(){
+  const c = navigator.connection || {};
+  $('netInfo').innerHTML = kv({ Online: navigator.onLine ? 'Yes' : 'No', 'Connection type': c.type || 'n/a', 'Effective speed class': c.effectiveType || 'n/a (Chrome and Edge only)',
+    'Browser estimate': c.downlink ? `${c.downlink} Mbps, ${c.rtt} ms` : 'n/a', 'Data saver': c.saveData ? 'On (the full test is not recommended)' : 'Off' });
+}
+function drawNet(){ $('netHist').innerHTML = NET.length ? kv(Object.fromEntries(NET.map(r => [r.at, `${r.down} down / ${r.up} up / ${r.ping} ms`]))) : '<li>No tests yet.</li>'; }
+async function netPing(ctl){
+  const t = [];
+  for(let i = 0; i < 9; i++){ const s = performance.now(); await fetch(`${SPEED}/__down?bytes=0&r=${Math.random()}`, { cache: 'no-store', signal: ctl.signal }); t.push(performance.now() - s); }
+  t.shift(); const sorted = [...t].sort((x, y) => x - y);
+  return { ping: sorted[Math.floor(sorted.length / 2)], jitter: t.slice(1).reduce((s, v, i) => s + Math.abs(v - t[i]), 0) / (t.length - 1) };
+}
+async function netDown(ctl, z, onProg){
+  const t0 = performance.now(), stop = new AbortController(); let bytes = 0;
+  const abort = () => stop.abort(); ctl.signal.addEventListener('abort', abort); const timer = setTimeout(abort, z.secs * 1000);
+  const worker = async () => { try{
+    const r = await fetch(`${SPEED}/__down?bytes=${z.dl}&r=${Math.random()}`, { cache: 'no-store', signal: stop.signal }), rd = r.body.getReader();
+    for(;;){ const { done, value } = await rd.read(); if(done) break; bytes += value.length; onProg(mbps(bytes, t0)); }
+  }catch(e){ if(e.name !== 'AbortError') throw e; } };
+  try{ await Promise.all([worker(), worker(), worker()]); } finally { clearTimeout(timer); ctl.signal.removeEventListener('abort', abort); }
+  if(ctl.signal.aborted) throw new DOMException('Stopped', 'AbortError');
+  return mbps(bytes, t0);
+}
+async function netUp(ctl, z, onProg){
+  const buf = new Uint8Array(z.ul); for(let i = 0; i < buf.length; i += 65536) crypto.getRandomValues(buf.subarray(i, Math.min(i + 65536, buf.length)));
+  const t0 = performance.now(), cap = 4 * z.ul; let sent = 0;
+  const worker = async () => { while(!ctl.signal.aborted && sent < cap && performance.now() - t0 < z.secs * 1000){
+    await fetch(`${SPEED}/__up`, { method: 'POST', body: buf, cache: 'no-store', signal: ctl.signal }); sent += buf.length; onProg(mbps(sent, t0)); } };
+  await Promise.all([worker(), worker()]);
+  if(!sent) throw new Error('Upload was too slow to measure');
+  return mbps(sent, t0);
+}
+const verdict = (d, u, p) => d >= 25 && u >= 5 && p < 80 ? 'Fast enough for 4K streaming, video calls and large downloads.' : d >= 5 && u >= 1.5 ? 'Fine for HD video and calls.' : 'On the slow side: video calls and streaming may stutter.';
+$('netStart').onclick = async () => {
+  if(!navigator.onLine){ $('netNote').textContent = 'You appear to be offline.'; return; }
+  const z = SIZES[$('netSize').value], ctl = netCtl = new AbortController(), bar = p => $('netBar').style.width = p + '%', res = {};
+  ['nDown', 'nUp', 'nPing', 'nJit'].forEach(i => $(i).textContent = '–'); $('netStart').disabled = true; $('netStop').disabled = false;
+  try{
+    $('netNote').textContent = 'Measuring latency…'; bar(5);
+    const p = await netPing(ctl); res.ping = Math.round(p.ping); $('nPing').textContent = res.ping; $('nJit').textContent = p.jitter.toFixed(1);
+    $('netNote').textContent = 'Testing download…'; bar(30); res.down = +(await netDown(ctl, z, v => $('nDown').textContent = v.toFixed(1))).toFixed(1); $('nDown').textContent = res.down;
+    $('netNote').textContent = 'Testing upload…'; bar(70); res.up = +(await netUp(ctl, z, v => $('nUp').textContent = v.toFixed(1))).toFixed(1); $('nUp').textContent = res.up;
+    bar(100); $('netNote').textContent = 'Done. ' + verdict(res.down, res.up, res.ping);
+    NET.unshift({ at: new Date().toLocaleString(), ...res }); NET = NET.slice(0, 5); try{ localStorage.setItem('ll-net', JSON.stringify(NET)); }catch(e){}
+    drawNet(); mark('network', `${res.down} Mbps down, ${res.up} Mbps up, ${res.ping} ms latency`, res.down < 5 || res.up < 1 || res.ping > 150);
+  }catch(e){ $('netNote').textContent = e.name === 'AbortError' ? 'Stopped.' : 'Test failed: ' + e.message + '. The speed server may be blocked by your network, a firewall or a browser extension.'; }
+  $('netStart').disabled = false; $('netStop').disabled = true;
+};
+$('netStop').onclick = () => netCtl && netCtl.abort();
+$('netClear').onclick = () => { NET = []; try{ localStorage.removeItem('ll-net'); }catch(e){} drawNet(); };
+window.addEventListener('online', netInfo); window.addEventListener('offline', netInfo);
+drawNet();
+
+// ---- Wi-Fi stability ----
+const PING = 'https://speed.cloudflare.com/__down?bytes=0', sleep = ms => new Promise(r => setTimeout(r, ms));
+let wfCtl = null;
+async function pingOnce(ctl){
+  const to = new AbortController(), s = performance.now(), onAbort = () => to.abort(), timer = setTimeout(() => to.abort(), 3000);
+  ctl.signal.addEventListener('abort', onAbort);
+  try{ await fetch(`${PING}&r=${Math.random()}`, { mode: 'no-cors', cache: 'no-store', signal: to.signal }); return performance.now() - s; }
+  catch(e){ return null; } finally { clearTimeout(timer); ctl.signal.removeEventListener('abort', onAbort); }
+}
+function wfStats(sm){
+  const ok = sm.filter(v => v != null), sorted = [...ok].sort((x, y) => x - y), med = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0;
+  return { n: sm.length, ok: ok.length, avg: ok.length ? ok.reduce((x, y) => x + y, 0) / ok.length : 0, worst: ok.length ? Math.max(...ok) : 0,
+    loss: sm.length ? (sm.length - ok.length) / sm.length * 100 : 0, spikes: ok.filter(v => v > Math.max(200, 3 * med)).length };
+}
+function wfDraw(sm, total){
+  const cv = $('wfGraph'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = 200; cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext && cv.getContext('2d'); if(!g) return; g.scale(dpr, dpr);
+  const ok = sm.filter(v => v != null), top = Math.max(100, ...ok) * 1.1, L = 40, y = v => H - 16 - (v / top) * (H - 30), x = i => L + i * (W - L - 8) / Math.max(total - 1, 1);
+  g.font = '11px sans-serif'; g.fillStyle = '#8fb0b4'; g.strokeStyle = '#1d4a57'; g.lineWidth = 1;
+  [0, .5, 1].forEach(f => { const v = top * f; g.beginPath(); g.moveTo(L, y(v)); g.lineTo(W - 8, y(v)); g.stroke(); g.fillText(Math.round(v) + ' ms', 2, y(v) + 4); });
+  g.strokeStyle = '#ff7a1a'; g.lineWidth = 2; g.beginPath(); let pen = false;
+  sm.forEach((v, i) => { if(v == null){ pen = false; return; } pen ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); pen = true; }); g.stroke();
+  g.fillStyle = '#ff6b5e'; sm.forEach((v, i) => { if(v == null) g.fillRect(x(i) - 2, H - 14, 4, 12); });
+}
+$('wfStart').onclick = async () => {
+  if(!navigator.onLine){ $('wfNote').textContent = 'You appear to be offline.'; return; }
+  const total = +$('wfLen').value * 2, sm = [], ctl = wfCtl = new AbortController(); let done = false, dead = false;
+  $('wfStart').disabled = true; $('wfStop').disabled = false; $('wfNote').textContent = 'Measuring… walk around if you want to compare rooms.';
+  while(sm.length < total && !ctl.signal.aborted){
+    const s = performance.now(), v = await pingOnce(ctl); if(ctl.signal.aborted) break;
+    sm.push(v); const st = wfStats(sm);
+    $('wAvg').textContent = st.avg.toFixed(0); $('wWorst').textContent = st.worst.toFixed(0); $('wLoss').textContent = st.loss.toFixed(1); $('wSpk').textContent = st.spikes; wfDraw(sm, total);
+    if(sm.length >= 5 && st.ok === 0){ dead = true; break; }
+    const wait = 500 - (performance.now() - s); if(wait > 0) await sleep(wait);
+  }
+  done = sm.length >= total;
+  if(dead) $('wfNote').textContent = 'No replies at all. Check your internet connection, or the ping server may be blocked by your network or an extension.';
+  else if(done){
+    const st = wfStats(sm), spk = st.spikes / st.n, stable = st.loss === 0 && spk < .03, mostly = st.loss <= 2 && spk < .1, slow = st.avg > 150;
+    $('wfNote').textContent = stable && slow ? 'Steady but slow: delays above 150 ms make calls and games feel laggy.' : stable ? 'Stable: no lost replies and almost no lag spikes.' : mostly ? 'Mostly stable, with some lag spikes. Video calls may glitch now and then.' : 'Unstable: expect stuttering calls and slow pages. Try moving closer to the router.';
+    mark('wifi', `${st.avg.toFixed(0)} ms average, ${st.worst.toFixed(0)} ms worst, ${st.loss.toFixed(1)}% lost, ${st.spikes} spikes`, !stable || slow);
+  } else $('wfNote').textContent = 'Stopped.';
+  $('wfStart').disabled = false; $('wfStop').disabled = true;
+};
+$('wfStop').onclick = () => wfCtl && wfCtl.abort();
+
+// ---- Website reachability ----
+const SITES = { Google: 'https://www.google.com/generate_204', Cloudflare: 'https://www.cloudflare.com/cdn-cgi/trace', GitHub: 'https://github.com/', Wikipedia: 'https://www.wikipedia.org/', Microsoft: 'https://www.microsoft.com/' };
+async function reach(url){
+  const ctl = new AbortController(), s = performance.now(), timer = setTimeout(() => ctl.abort(), 6000);
+  try{ await fetch(url, { mode: 'no-cors', cache: 'no-store', signal: ctl.signal }); return Math.round(performance.now() - s) + ' ms'; }
+  catch(e){ return e.name === 'AbortError' ? 'Timed out' : 'Unreachable'; } finally { clearTimeout(timer); }
+}
+const reachRows = rows => $('reachList').innerHTML = rows.map(([n, t]) => `<li><span>${esc(n)}</span><span class="${/ms$/.test(t) ? 'ok' : 'no'}">${esc(t)}</span></li>`).join('');
+$('reachGo').onclick = async () => { reachRows(Object.keys(SITES).map(n => [n, 'Checking…'])); reachRows(await Promise.all(Object.entries(SITES).map(async ([n, u]) => [n, await reach(u)]))); };
+$('reachOne').onclick = async () => {
+  let v = $('reachUrl').value.trim(); if(!v) return; if(!/^https?:\/\//i.test(v)) v = 'https://' + v;
+  let u; try{ u = new URL(v); if(!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) throw 0; }catch(e){ reachRows([['Address', 'Not a valid website address']]); return; }
+  reachRows([[u.hostname, 'Checking…']]); reachRows([[u.hostname, await reach(u.href)]]);
+};
+
+// ---- Notification test ----
+$('notifTest').onclick = async () => {
+  if(!('Notification' in window)){ $('notifMsg').textContent = 'Notifications are not supported in this browser.'; return; }
+  try{
+    const p = await Notification.requestPermission();
+    if(p === 'granted'){ new Notification('Laptop Lab', { body: 'Notifications work on this laptop.' }); $('notifMsg').textContent = 'Sent. If you saw nothing, check Focus Assist or Do Not Disturb.'; }
+    else $('notifMsg').textContent = 'Permission is ' + p + '. Allow notifications for this site in the address bar to test.';
+  }catch(e){ $('notifMsg').textContent = 'Could not send: ' + e.message; }
+};
+
+// ---- Performance benchmark ----
+const sieve = (n, r) => { let c = 0; for(let k = 0; k < r; k++){ const s = new Uint8Array(n + 1); for(let i = 2; i * i <= n; i++) if(!s[i]) for(let j = i * i; j <= n; j += i) s[j] = 1; c = 0; for(let i = 2; i <= n; i++) if(!s[i]) c++; } return c; };
+const tick = () => new Promise(r => setTimeout(r, 30));
+$('benchStart').onclick = async () => {
+  $('benchStart').disabled = true; const out = {}, show = () => $('benchInfo').innerHTML = kv(out);
+  out.Status = 'Testing one core…'; show(); await tick();
+  let t0 = performance.now(); sieve(5e6, 8); const single = performance.now() - t0; out['One core'] = single.toFixed(0) + ' ms (lower is faster)';
+  out.Status = 'Testing all cores…'; show(); await tick();
+  let multi = null, n = Math.min(navigator.hardwareConcurrency || 4, 16);
+  try{
+    const url = URL.createObjectURL(new Blob([`const f=${sieve.toString()};onmessage=e=>postMessage(f(e.data.n,e.data.r));`], { type: 'text/javascript' }));
+    t0 = performance.now();
+    await Promise.all(Array.from({ length: n }, () => new Promise((res, rej) => { const w = new Worker(url); w.onmessage = () => { w.terminate(); res(); }; w.onerror = rej; w.postMessage({ n: 5e6, r: 8 }); })));
+    multi = performance.now() - t0; URL.revokeObjectURL(url);
+    out[`All ${n} threads`] = multi.toFixed(0) + ' ms'; out['Parallel speedup'] = (n * single / multi).toFixed(1) + '× (ideal is ' + n + '×)';
+  }catch(e){ out['All threads'] = 'Not available in this browser'; }
+  out.Status = 'Testing memory…'; show(); await tick();
+  const a = new Float64Array(4e6), b = new Float64Array(4e6); t0 = performance.now(); for(let i = 0; i < 20; i++) b.set(a);
+  const gbs = 4e6 * 8 * 20 / ((performance.now() - t0) / 1000) / 1e9; out['Memory copy speed'] = gbs.toFixed(1) + ' GB/s';
+  delete out.Status; show(); $('benchStart').disabled = false;
+  mark('benchmark', `${single.toFixed(0)} ms one core, ${multi ? multi.toFixed(0) + ' ms on ' + n + ' threads, ' : ''}${gbs.toFixed(1)} GB/s memory`);
+};
+
+// ---- Field report ----
+function repSummary(){
+  const done = CHECKS.filter(id => R[id] && R[id].done), warns = done.filter(id => R[id].warn).map(id => NAME[id]);
+  $('repSum').textContent = `${done.length} of ${CHECKS.length} checks done.` + (warns.length ? ' Needs attention: ' + warns.join(', ') + '.' : done.length ? ' Nothing needs attention.' : '');
+}
+function report(){ repSummary();
+  $('repList').innerHTML = TESTS.map(([id, n]) => { const r = R[id], ok = r && r.done;
+    return `<li><span>${n}</span><span class="chip ${ok ? (r.warn ? 'warn' : 'ok') : 'no'}">${status(id)}</span><span>${ok ? esc(r.detail) : ''}</span></li>`; }).join('');
+}
+const repText = () => ['Laptop Lab field report', new Date().toLocaleString(), ''].concat(TESTS.map(([id, n]) => `${n}: ${R[id] && R[id].done ? status(id) + ' - ' + R[id].detail : status(id)}`)).join('\n');
 function save(name, type, text){ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); }
 $('repTxt').onclick = () => save('field-report.txt', 'text/plain', repText());
 $('repJson').onclick = () => save('field-report.json', 'application/json', JSON.stringify({ date: new Date().toISOString(), results: R }, null, 2));
 $('repPrint').onclick = () => window.print();
+$('repCopy').onclick = async () => { try{ await navigator.clipboard.writeText(repText()); $('repMsg').textContent = 'Report copied.'; }catch(e){ $('repMsg').textContent = 'Copy is blocked here. Use Download report instead.'; } };
 $('repClear').onclick = () => { R = {}; try{ localStorage.removeItem('ll-results'); }catch(e){} paint(); report(); };
 
 // ---- Compatibility ----
