@@ -4,6 +4,12 @@
 
 An expedition-styled browser app that tests your laptop hardware. Nothing to install. Everything runs in your browser; only the network tests (speed, Wi-Fi stability and website checks) use the internet. 
 
+## Try It Out
+
+[![Laptop Lab App](https://img.shields.io/badge/Try%20Laptop%20Lab-Live%20Demo-orange?style=for-the-badge)](https://lokilancer.github.io/Laptop-Lab/)
+
+Click above or visit: https://lokilancer.github.io/Laptop-Lab/
+
 ## Checks
 - **Display**: full-screen color fills for dead pixels and backlight, plus screen info.
 - **Camera**: live preview with real resolution and frame rate.
