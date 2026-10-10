@@ -20,8 +20,10 @@ Camera and microphone need HTTPS or localhost.
 ```bash
 python3 -m http.server 8000   # open http://localhost:8000
 ```
+
 Or deploy with GitHub Pages.
 
 The Home page shows which checks your browser supports. Chrome and Edge support everything; Firefox and Safari lack battery info and output selection. Browsers can test hardware but can't change system settings such as brightness or key mappings.
+<img width="1351" height="956" alt="image" src="https://github.com/user-attachments/assets/52488c7b-c688-46ec-866d-6c93fabcb07a" />
 
 MIT License
