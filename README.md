@@ -1,40 +1,32 @@
-<p align="center"><img src="logo.svg" width="96" alt="Laptop Lab logo"></p>
+<p align="center">
+  <img src="logo.svg" width="96" alt="Laptop Lab logo">
+</p>
 
-# Laptop Lab
+<h1 align="center">Laptop Lab</h1>
 
-An expedition-styled browser app that tests your laptop hardware. Nothing to install. Everything runs in your browser; only the network tests (speed, Wi-Fi stability and website checks) use the internet. 
+<p align="center">
+  <a href="https://lokilancer.github.io/Laptop-Lab/">
+    <img src="https://img.shields.io/badge/Try_it_live-Open_Laptop_Lab-ff7a1a?style=for-the-badge" alt="Try Laptop Lab live">
+  </a>
+</p>
 
-## Try It Out
+<p align="center">
+  An expedition-styled browser app that tests your laptop hardware.<br>
+  Nothing to install. Everything runs in your browser; only the network tests use the internet, and only when you press Start.<br>
+  Or open it directly: <a href="https://lokilancer.github.io/Laptop-Lab/">lokilancer.github.io/Laptop-Lab</a>
+</p>
 
-[![Laptop Lab App](https://img.shields.io/badge/Try%20Laptop%20Lab-Live%20Demo-orange?style=for-the-badge)](https://lokilancer.github.io/Laptop-Lab/)
-
-Click above or visit: https://lokilancer.github.io/Laptop-Lab/
-
-## Checks
-- **Display**: full-screen color fills for dead pixels and backlight, plus screen info.
+- **Display**: color fills for dead pixels, plus banding, ghosting, backlight bleed and pixel sharpness tests, a refresh-rate meter, and color gamut and HDR detection.
 - **Camera**: live preview with real resolution and frame rate.
 - **Microphone**: level meter with peak hold.
-- **Touchpad & mouse**: clicks, double clicks, scroll, pinch, input type and move events per second.
-- **Keyboard**: on-screen layout that marks every key you press, held keys and rollover. Works on built-in laptop keyboards.
-- **Speakers**: left, right and both-channel tones, pitch choice, a 100 Hz to 10 kHz sweep and output selection (Chrome/Edge).
-- **Battery**: charge level and charging state (Chrome, Edge, Opera).
-- **Game controller** (optional): live buttons and sticks, plus a vibration test.
-- **Network speed**: latency, jitter, download and upload speed using Cloudflare's public speed-test servers (about 20 MB for the quick test, up to about 100 MB for the full test), plus a history of previous tests.
-- **Wi-Fi stability**: pings a server twice a second and graphs delay, lost replies and lag spikes. Walk around to find weak spots. (Browsers can't read Wi-Fi signal strength, so this measures real connection quality.)
-- **Website checks** (on the Network page): see whether common sites or any address you type respond, and how fast.
-- **Performance**: one-core and all-core CPU benchmark, parallel speedup and memory copy speed.
-- **System**: CPU threads, approximate memory, graphics, language, time zone, connection, browser storage, permission states and a test notification.
+- **Touchpad & mouse**: clicks, scroll, pinch, input type and move events per second.
+- **Keyboard**: on-screen layout that marks every key you press, held keys and rollover.
+- **Speakers**: left/right tones, pitch choice, a 100 Hz to 10 kHz sweep and output selection (Chrome/Edge).
+- **Battery**: charge level plus a drain tracker that estimates hours left (Chrome/Edge).
+- **Network speed**: latency, jitter, download and upload using Cloudflare's speed servers, plus website reachability checks.
+- **Wi-Fi stability**: live graph of delay, lost replies and lag spikes. Walk around to find weak spots.
+- **Performance**: one-core and all-core CPU benchmark and memory speed.
+- **System**: CPU threads, memory, graphics, storage limit, permissions and a test notification.
+- **Touchscreen & pen** and **Game controller** (optional).
 
-A **guided run** walks you through every check in order. Checks that find a problem, such as a slow connection, unstable Wi-Fi or low battery, get an orange flag, and the report summarises what needs attention.
-
-## Run
-Camera and microphone need HTTPS or localhost.
-
-```bash
-python3 -m http.server 8000   # open http://localhost:8000
-```
-Or deploy with GitHub Pages.
-
-Works offline after the first visit and can be installed as an app from Chrome or Edge. The Home page shows which checks your browser supports. Chrome and Edge support everything; Firefox and Safari have fewer features.
-
-MIT License
+A guided run walks through every check, orange flags mark problems, and the Field report can be downloaded or printed. There is a light Day theme, and the app works offline after the first visit.
