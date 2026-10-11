@@ -9,6 +9,7 @@ const TESTS = [
   ['mic','Microphone','#2dd4bf','<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/>'],
   ['pointer','Touchpad & mouse','#a78bfa','<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 3v7"/>'],
   ['keyboard','Keyboard','#f472b6','<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>'],
+  ['touch','Touchscreen & pen','#fda4af','<path d="M9 11V5a2 2 0 014 0v6M13 10a2 2 0 014 0v3a6 6 0 01-6 6h-1a5 5 0 01-4-2l-2-3a2 2 0 013-2l2 2"/>'],
   ['gamepad','Game controller','#c084fc','<rect x="3" y="8" width="18" height="9" rx="4.5"/><path d="M8 11v3M6.5 12.5h3M16 11.5h.01M18 13.5h.01"/>'],
   ['speakers','Speakers','#fb923c','<path d="M4 9h4l5-4v14l-5-4H4zM17 8a5 5 0 010 8"/>'],
   ['battery','Battery','#facc15','<rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 11v2M7 10v4M11 10v4"/>'],
@@ -17,8 +18,8 @@ const TESTS = [
   ['benchmark','Performance','#f87171','<path d="M4 17a8 8 0 1116 0M12 17l4-6"/>'],
   ['system','System','#60a5fa','<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>']
 ];
-const NAME = Object.fromEntries(TESTS.map(t => [t[0], t[1]])), CHECKS = TESTS.map(t => t[0]).filter(id => id !== 'gamepad' && (id !== 'battery' || navigator.getBattery));
-const status = id => R[id] && R[id].done ? (R[id].warn ? 'Check' : 'Done') : id === 'gamepad' ? 'Optional' : 'Not run';
+const NAME = Object.fromEntries(TESTS.map(t => [t[0], t[1]])), CHECKS = TESTS.map(t => t[0]).filter(id => !['gamepad', 'touch'].includes(id) && (id !== 'battery' || navigator.getBattery));
+const status = id => R[id] && R[id].done ? (R[id].warn ? 'Check' : 'Done') : ['gamepad', 'touch'].includes(id) ? 'Optional' : 'Not run';
 let R = {}; try{ R = JSON.parse(localStorage.getItem('ll-results') || '{}'); }catch(e){}
 function mark(id, detail, warn){ R[id] = { done: true, warn: !!warn, detail, at: new Date().toLocaleString() }; try{ localStorage.setItem('ll-results', JSON.stringify(R)); }catch(e){} paint(); }
 function paint(){
@@ -156,7 +157,7 @@ async function battery(){
   const b = await navigator.getBattery();
   const draw = () => $('batInfo').innerHTML = kv({ Level: Math.round(b.level * 100) + '%', Charging: b.charging ? 'Yes' : 'No',
     'Time to full': b.charging && isFinite(b.chargingTime) ? Math.round(b.chargingTime / 60) + ' min' : '-', 'Time remaining': !b.charging && isFinite(b.dischargingTime) ? Math.round(b.dischargingTime / 60) + ' min' : '-' });
-  draw(); mark('battery', Math.round(b.level * 100) + '% ' + (b.charging ? 'charging' : 'on battery') + (b.level < .2 && !b.charging ? ' (low)' : ''), b.level < .2 && !b.charging); if(!batBound){ ['levelchange', 'chargingchange', 'chargingtimechange', 'dischargingtimechange'].forEach(ev => b.addEventListener(ev, draw)); batBound = true; }
+  draw(); mark('battery', Math.round(b.level * 100) + '% ' + (b.charging ? 'charging' : 'on battery') + (b.level < .2 && !b.charging ? ' (low)' : '') + batRate.text, (b.level < .2 && !b.charging) || batRate.warn); if(!batBound){ ['levelchange', 'chargingchange', 'chargingtimechange', 'dischargingtimechange'].forEach(ev => b.addEventListener(ev, draw)); batBound = true; }
 }
 // ---- Extras: refresh rate, snapshot, mic playback ----
 $('hzBtn').onclick = () => {
@@ -338,7 +339,7 @@ function wfDraw(sm, total){
   const cv = $('wfGraph'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = 200; cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext && cv.getContext('2d'); if(!g) return; g.scale(dpr, dpr);
   const ok = sm.filter(v => v != null), top = Math.max(100, ...ok) * 1.1, L = 40, y = v => H - 16 - (v / top) * (H - 30), x = i => L + i * (W - L - 8) / Math.max(total - 1, 1);
-  g.font = '11px sans-serif'; g.fillStyle = '#8fb0b4'; g.strokeStyle = '#1d4a57'; g.lineWidth = 1;
+  g.font = '11px sans-serif'; g.fillStyle = css('--mute'); g.strokeStyle = css('--contour'); g.lineWidth = 1;
   [0, .5, 1].forEach(f => { const v = top * f; g.beginPath(); g.moveTo(L, y(v)); g.lineTo(W - 8, y(v)); g.stroke(); g.fillText(Math.round(v) + ' ms', 2, y(v) + 4); });
   g.strokeStyle = '#ff7a1a'; g.lineWidth = 2; g.beginPath(); let pen = false;
   sm.forEach((v, i) => { if(v == null){ pen = false; return; } pen ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); pen = true; }); g.stroke();
@@ -413,6 +414,109 @@ $('benchStart').onclick = async () => {
   delete out.Status; show(); $('benchStart').disabled = false;
   mark('benchmark', `${single.toFixed(0)} ms one core, ${multi ? multi.toFixed(0) + ' ms on ' + n + ' threads, ' : ''}${gbs.toFixed(1)} GB/s memory`);
 };
+
+// ---- Theme ----
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
+function setTheme(t){
+  document.documentElement.dataset.theme = t; try{ localStorage.setItem('ll-theme', t); }catch(e){}
+  $('themeTxt').textContent = t === 'day' ? 'Night theme' : 'Day theme';
+  const m = document.querySelector('meta[name="theme-color"]'); if(m) m.content = t === 'day' ? '#f1e8d0' : '#0a1d26';
+}
+$('themeBtn').onclick = () => setTheme(document.documentElement.dataset.theme === 'day' ? 'night' : 'day');
+setTheme(document.documentElement.dataset.theme === 'day' ? 'day' : 'night');
+
+// ---- More display tests ----
+const fx = document.createElement('div'); fx.id = 'fx'; fx.style.cssText = 'position:fixed;inset:0;z-index:99;display:none;cursor:pointer;overflow:hidden'; document.body.append(fx);
+let fxRaf = 0;
+const fxHint = (t, c) => `<span style="position:absolute;bottom:12px;left:0;right:0;text-align:center;font:13px sans-serif;color:${c || '#999'};pointer-events:none;mix-blend-mode:difference">${t}</span>`;
+function fxClose(){ cancelAnimationFrame(fxRaf); fx.style.display = 'none'; fx.innerHTML = ''; if(document.fullscreenElement || document.webkitFullscreenElement){ const ex = document.exitFullscreen || document.webkitExitFullscreen; if(ex) ex.call(document); } }
+const FX = {
+  banding(){ fx.style.background = '#000'; fx.innerHTML = ['#fff', '#f00', '#0f0', '#00f'].map(c => `<div style="height:25%;background:linear-gradient(90deg,#000,${c})"></div>`).join('') + fxHint('Look for visible steps in the gradients. Click to exit.'); },
+  sharp(){ fx.style.background = 'repeating-conic-gradient(#fff 0 25%,#000 0 50%) 0 0/2px 2px'; fx.innerHTML = fxHint('Should look an even grey. Stripes or shimmer mean scaling is on. Click to exit.', '#f0f'); },
+  bleed(){ fx.style.background = '#000'; fx.innerHTML = fxHint('Dim the room. Look for glowing edges or corners. Click to exit.', '#333'); },
+  ghost(){
+    fx.style.background = '#808080'; fx.innerHTML = fxHint('Watch for smears behind the boxes. Click to exit.', '#fff');
+    const boxes = [240, 480, 960, 1920].map((v, i) => { const b = document.createElement('div'); b.style.cssText = `position:absolute;top:${i * 22 + 6}%;left:0;width:70px;height:70px;background:#fff;border-radius:8px`; fx.append(b); return [b, v]; });
+    const t0 = performance.now(), step = t => { const W = innerWidth + 70; boxes.forEach(([b, v]) => b.style.left = (((t - t0) / 1000 * v) % W - 70) + 'px'); fxRaf = requestAnimationFrame(step); }; fxRaf = requestAnimationFrame(step);
+  }
+};
+document.querySelectorAll('[data-fx]').forEach(b => b.onclick = () => {
+  FX[b.dataset.fx](); fx.style.display = 'block';
+  const req = fx.requestFullscreen || fx.webkitRequestFullscreen; if(req){ try{ Promise.resolve(req.call(fx)).catch(() => {}); }catch(e){} }
+});
+fx.onclick = fxClose;
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && fx.style.display === 'block') fxClose(); });
+document.addEventListener('fullscreenchange', () => { if(!document.fullscreenElement && fx.style.display === 'block') fxClose(); });
+
+// ---- Touchscreen & pen ----
+(function(){
+  const cv = $('touchPad'), pts = new Map(), seen = { touch: false, pen: false, mouse: false }; let max = 0, press = 0, tilt = 0;
+  const ctx = () => cv.getContext && cv.getContext('2d'), COL = { touch: '--moss', pen: '--flare', mouse: '--sand' };
+  function fit(){ const dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 600; if(cv.width !== Math.round(W * dpr)){ cv.width = Math.round(W * dpr); cv.height = Math.round(360 * dpr); const c = ctx(); if(c) c.scale(dpr, dpr); } }
+  const fingers = () => [...pts.values()].filter(p => p.type === 'touch').length;
+  function info(){ $('touchInfo').innerHTML = kv({ 'Touch points supported': navigator.maxTouchPoints || 0, 'Touch seen': seen.touch ? 'Yes' : 'No', 'Pen seen': seen.pen ? 'Yes' : 'No', 'Fingers down now': fingers(), 'Most fingers at once': max, 'Pen pressure (last)': press.toFixed(2), 'Pen tilt (last)': tilt + '°' }); }
+  $('touchNote').textContent = navigator.maxTouchPoints ? '' : 'No touchscreen detected. You can still test a pen or mouse.';
+  const pos = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  cv.addEventListener('pointerdown', e => {
+    fit(); try{ cv.setPointerCapture(e.pointerId); }catch(x){}
+    const type = e.pointerType || 'mouse', p = pos(e); pts.set(e.pointerId, { ...p, type }); seen[type] = true; max = Math.max(max, fingers());
+    if(type === 'pen'){ press = e.pressure || 0; tilt = Math.round(e.tiltX || 0); }
+    if(seen.touch || seen.pen) mark('touch', `${seen.touch ? max + ' finger' + (max === 1 ? '' : 's') + ' at once' : ''}${seen.touch && seen.pen ? ', ' : ''}${seen.pen ? 'pen detected' : ''}`);
+    info();
+  });
+  cv.addEventListener('pointermove', e => {
+    const q = pts.get(e.pointerId); if(!q) return; const p = pos(e), c = ctx();
+    if(e.pointerType === 'pen'){ press = e.pressure || 0; tilt = Math.round(e.tiltX || 0); }
+    if(c){ c.strokeStyle = css(COL[q.type] || '--sand'); c.lineWidth = q.type === 'pen' ? 1 + (e.pressure || .3) * 8 : 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(p.x, p.y); c.stroke(); }
+    q.x = p.x; q.y = p.y; info();
+  });
+  const up = e => { pts.delete(e.pointerId); info(); };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  $('touchClear').onclick = () => { const c = ctx(); if(c) c.clearRect(0, 0, cv.clientWidth, 360); pts.clear(); max = 0; press = 0; tilt = 0; info(); };
+  info();
+})();
+
+// ---- Battery drain tracker ----
+const batRate = { text: '', warn: false }, BAT_MS = 30000;
+let BAT = []; try{ BAT = JSON.parse(localStorage.getItem('ll-bat') || '[]'); }catch(e){}
+let batTimer = null, batObj = null;
+async function batSample(){
+  if(!navigator.getBattery){ $('batNote').textContent = 'Battery info is not supported in this browser. Use Chrome or Edge.'; return; }
+  const b = batObj || (batObj = await navigator.getBattery());
+  BAT.push({ t: Date.now(), l: Math.round(b.level * 1000) / 10, c: b.charging });
+  BAT = BAT.filter(s => Date.now() - s.t < 6 * 3600e3).slice(-720);
+  try{ localStorage.setItem('ll-bat', JSON.stringify(BAT)); }catch(e){}
+  batStats();
+}
+function batDraw(){
+  const cv = $('batGraph'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth || 600, H = 180; cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext && cv.getContext('2d'); if(!g) return; g.scale(dpr, dpr); g.font = '11px sans-serif';
+  const L = 38, y = l => H - 16 - (l / 100) * (H - 30); g.fillStyle = css('--mute'); g.strokeStyle = css('--contour'); g.lineWidth = 1;
+  [0, 50, 100].forEach(l => { g.beginPath(); g.moveTo(L, y(l)); g.lineTo(W - 8, y(l)); g.stroke(); g.fillText(l + '%', 4, y(l) + 4); });
+  if(BAT.length < 2){ g.fillText('Waiting for data…', L + 10, H / 2); return; }
+  const t0 = BAT[0].t, span = Math.max(BAT[BAT.length - 1].t - t0, 60000), x = t => L + (t - t0) / span * (W - L - 8); g.lineWidth = 2.5; g.lineCap = 'round';
+  for(let i = 1; i < BAT.length; i++){ g.strokeStyle = css(BAT[i].c ? '--moss' : '--flare'); g.beginPath(); g.moveTo(x(BAT[i - 1].t), y(BAT[i - 1].l)); g.lineTo(x(BAT[i].t), y(BAT[i].l)); g.stroke(); }
+}
+function batStats(){
+  $('bSamples').textContent = BAT.length; batDraw();
+  const last = BAT[BAT.length - 1], dash = () => { $('bRate').textContent = '–'; $('bLeft').textContent = '–'; };
+  if(!last){ dash(); $('batNote').textContent = 'No data yet. Press Start tracking.'; return; }
+  if(last.c){ dash(); batRate.text = ''; batRate.warn = false; $('batNote').textContent = 'Plugged in. Unplug the charger to measure how fast the battery drains.'; return; }
+  const run = []; for(let i = BAT.length - 1; i >= 0 && !BAT[i].c; i--) run.unshift(BAT[i]);
+  const mins = run.length > 1 ? (run[run.length - 1].t - run[0].t) / 60000 : 0;
+  if(mins < 10){ dash(); $('batNote').textContent = `Collecting data… about ${Math.ceil(10 - mins)} more minutes on battery power needed.`; return; }
+  const xs = run.map(s => (s.t - run[0].t) / 3600e3), ys = run.map(s => s.l), n = run.length, sum = v => v.reduce((p, q) => p + q, 0);
+  const sx = sum(xs), sy = sum(ys), slope = (n * sum(xs.map((v, i) => v * ys[i])) - sx * sy) / (n * sum(xs.map(v => v * v)) - sx * sx), rate = -slope;
+  if(!(rate > 0.05)){ dash(); $('batNote').textContent = 'The level has not dropped enough to measure yet. Keep tracking.'; return; }
+  const left = last.l / rate; $('bRate').textContent = rate.toFixed(1); $('bLeft').textContent = left.toFixed(1);
+  batRate.text = ` (drains ${rate.toFixed(0)}%/h)`; batRate.warn = rate > 20;
+  $('batNote').textContent = rate > 20 ? 'High drain. Check for heavy apps, a bright screen or too many tabs.' : rate > 12 ? 'Moderate drain, typical for active work.' : 'Light drain.';
+  mark('battery', `${Math.round(last.l)}% on battery, drains ${rate.toFixed(1)}%/h, about ${left.toFixed(1)} h left`, batRate.warn || last.l < 20);
+}
+$('batStart').onclick = () => { if(batTimer) return; batSample(); batTimer = setInterval(batSample, BAT_MS); $('batStart').disabled = true; $('batStop').disabled = false; };
+$('batStop').onclick = () => { clearInterval(batTimer); batTimer = null; $('batStart').disabled = false; $('batStop').disabled = true; };
+$('batClear').onclick = () => { BAT = []; batRate.text = ''; batRate.warn = false; try{ localStorage.removeItem('ll-bat'); }catch(e){} batStats(); };
+batStats();
 
 // ---- Field report ----
 function repSummary(){
