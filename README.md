@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/lokilancer/TMMV-ROBOTICS/main/assets/loki-lancer-horse.svg" width="112" alt="Loki Lancer blue horse logo"></p>
+
 <p align="center">
   <img src="logo.svg" width="96" alt="Laptop Lab logo">
 </p>
@@ -30,3 +32,7 @@
 - **Touchscreen & pen** and **Game controller** (optional).
 
 A guided run walks through every check, orange flags mark problems, and the Field report can be downloaded or printed. There is a light Day theme, and the app works offline after the first visit.
+
+---
+
+<p align="center">Made by <strong>Loki Lancer</strong></p>
