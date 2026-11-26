@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/lokilancer/TMMV-ROBOTICS/main/assets/loki-lancer-horse.svg" width="112" alt="Loki Lancer blue horse logo"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/lokilancer/TMMV-ROBOTICS/main/assets/loki-lancer-horse.webp" width="112" alt="@Loki_Lancer blue horse logo"></p>
 
 <p align="center">
   <img src="logo.svg" width="96" alt="Laptop Lab logo">
@@ -35,4 +35,4 @@ A guided run walks through every check, orange flags mark problems, and the Fiel
 
 ---
 
-<p align="center">Made by <strong>Loki Lancer</strong></p>
+<p align="center">Made by <strong>@Loki_Lancer</strong></p>
